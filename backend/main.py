@@ -5,7 +5,7 @@ import os
 
 from config import settings
 from database.db import init_db
-from api import upload, process, risk, cam, research
+from api import upload, process, risk, cam, research, dashboard
 
 # ─── App Initialization ───────────────────────────────────────────────────────
 
@@ -61,6 +61,7 @@ app.include_router(risk.router)
 app.include_router(cam.router)
 app.include_router(research.router)
 app.include_router(research.legacy_router)
+app.include_router(dashboard.router)
 
 # ─── Main Block ───────────────────────────────────────────────────────────────
 

@@ -37,9 +37,18 @@ async def get_cam_report(
     res_company = await db.execute(select(Company).where(Company.id == company_id))
     company = res_company.scalars().first()
 
+    # Only generate CAM from a completed, real score payload.
+    if analysis.overall_credit_score is None or not analysis.score_breakdown:
+        raise HTTPException(
+            status_code=409,
+            detail="Analysis exists but score data is incomplete. Re-run full analysis before CAM generation.",
+        )
+
     # If paths exist, return them. Otherwise generate.
     if format == "pdf" and analysis.cam_pdf_path and os.path.exists(analysis.cam_pdf_path):
         return FileResponse(analysis.cam_pdf_path, filename=f"CAM_{company.name}.pdf")
+    if format == "docx" and analysis.cam_docx_path and os.path.exists(analysis.cam_docx_path):
+        return FileResponse(analysis.cam_docx_path, filename=f"CAM_{company.name}.docx")
     
     generator = CAMGenerator()
     results = generator.generate(
@@ -50,7 +59,12 @@ async def get_cam_report(
             "loan_decision": analysis.loan_decision,
             "credit_score": analysis.overall_credit_score,
             "risk_flags": analysis.risk_flags,
-            "financial_metrics": analysis.score_breakdown.get("ratios", {}), # Placeholder for metrics
+            "financial_metrics": analysis.score_breakdown.get("financial_metrics", {}),
+            "financial_summary": analysis.score_breakdown.get("financial_summary", {}),
+            "recommended_loan_limit": analysis.score_breakdown.get("recommended_loan_limit"),
+            "risk_premium": analysis.score_breakdown.get("risk_premium"),
+            "missing_fields": analysis.score_breakdown.get("missing_fields", []),
+            "explanation": analysis.score_breakdown.get("explanation", ""),
             "score_breakdown": analysis.score_breakdown
         }
     )

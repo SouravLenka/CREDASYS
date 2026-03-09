@@ -1,4 +1,4 @@
-# CredIntel AI — Intelligent Corporate Credit Decision Engine
+# CREDASYS — Intelligent Corporate Credit Decision Engine
 
 > AI-powered credit risk analysis platform for hackathons and production use.
 
@@ -18,7 +18,7 @@
 
 ```bash
 git clone <repo>
-cd credintel-ai
+cd credasys
 ```
 
 ### 2. Backend Setup
@@ -81,7 +81,7 @@ App: http://localhost:3000
 ## 🏗️ Project Structure
 
 ```
-credintel-ai/
+credasys/
 ├── backend/
 │   ├── main.py                    # FastAPI app + routes
 │   ├── config.py                  # Settings via pydantic-settings
@@ -203,3 +203,5 @@ Documents → PyMuPDF/Unstructured → Text → Chunking
 ---
 
 _Built for hackathon. Production-ready architecture._
+
+

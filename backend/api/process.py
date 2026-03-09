@@ -3,21 +3,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database.db import get_db
 from database.models import CompanyAnalysis, Document, Company
 from ingestion.document_router import DocumentIngestor
-from api.auth import verify_firebase_token
+from api.auth import verify_firebase_token, normalize_user_uuid
 from loguru import logger
 from sqlalchemy import select
-import uuid
 
 router = APIRouter(prefix="/api", tags=["Process"])
 
-
-def _safe_user_uuid(user: dict, fallback_uuid: str) -> str:
-    """Ensure user_id stored in DB is always UUID-compatible."""
-    raw_uid = user.get("uid", "")
-    try:
-        return str(uuid.UUID(str(raw_uid)))
-    except (ValueError, TypeError):
-        return str(uuid.UUID(str(fallback_uuid)))
 
 @router.post("/process")
 async def process_documents(
@@ -66,7 +57,7 @@ async def process_documents(
     # Reading historical rows can fail if legacy data has malformed UUID values.
     analysis = CompanyAnalysis(
         company_id=company_id,
-        user_id=_safe_user_uuid(user, company_id),
+        user_id=normalize_user_uuid(user),
     )
     db.add(analysis)
 

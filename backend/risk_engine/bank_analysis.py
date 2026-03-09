@@ -16,7 +16,7 @@ def analyze_ecs_returns(returns: int) -> str:
     if returns is None:
         return ""
     if returns > 3:
-        return f"[HARD_REJECT] Serious repayment risk: {returns} ECS/NACH returns"
+        return f"Serious repayment risk: {returns} ECS/NACH returns"
     return ""
 
 def analyze_od_utilization(util_percent: float) -> str:
@@ -35,7 +35,7 @@ def analyze_nach_obligation(nach_percent: float) -> str:
     if nach_percent is None:
         return ""
     if nach_percent > 75:
-        return f"[HARD_REJECT] High default risk: NACH obligation {nach_percent}% (>75%)"
+        return f"High default risk: NACH obligation {nach_percent}% (>75%)"
     elif nach_percent > 55:
         return f"Risk: NACH obligation {nach_percent}% (>55%)"
     return ""

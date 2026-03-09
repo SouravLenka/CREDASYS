@@ -1,4 +1,3 @@
-// Axios API client for CredIntel AI backend
 import axios from "axios";
 import { getIdToken } from "./firebase";
 
@@ -7,7 +6,7 @@ const DEFAULT_BASE_URL =
 
 function getBaseUrl() {
   if (typeof window === "undefined") return DEFAULT_BASE_URL;
-  return localStorage.getItem("credintel_backend_url") || DEFAULT_BASE_URL;
+  return localStorage.getItem("credasys_backend_url") || DEFAULT_BASE_URL;
 }
 
 function getCandidateBases() {
@@ -30,7 +29,6 @@ function getCandidateBases() {
 
 const api = axios.create({ baseURL: DEFAULT_BASE_URL });
 
-// Attach Firebase auth token to every request
 api.interceptors.request.use(async (config) => {
   try {
     const token = await getIdToken();
@@ -39,7 +37,6 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-// Retry once on host mismatch network errors (localhost <-> 127.0.0.1).
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -65,8 +62,6 @@ api.interceptors.response.use(
     return api.request(config);
   },
 );
-
-// ── Document Upload ───────────────────────────────────────────────────────────
 
 export interface UploadResponse {
   company_id: string;
@@ -115,8 +110,6 @@ export async function uploadDocuments(
 
   throw lastError;
 }
-
-// ── Company Analysis ──────────────────────────────────────────────────────────
 
 export interface AnalysisResponse {
   company_id: string;
@@ -207,8 +200,6 @@ export async function runResearch(companyName: string): Promise<ResearchResponse
   throw lastError;
 }
 
-// ── Generate Report ───────────────────────────────────────────────────────────
-
 export interface ReportResponse {
   analysis_id: string;
   pdf_url: string;
@@ -223,11 +214,107 @@ export async function generateReport(
   window.open(`${base}/api/cam/${companyId}?format=${format}`, "_blank");
 }
 
-// ── Risk Score ────────────────────────────────────────────────────────────────
+export async function fetchCamReport(
+  companyId: string,
+  format: "pdf" | "docx" = "pdf",
+): Promise<Blob> {
+  const token = await getIdToken().catch(() => "");
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+  let lastError: unknown;
+  for (const base of getCandidateBases()) {
+    try {
+      const { data } = await axios.get(`${base}/api/cam/${companyId}?format=${format}`, {
+        headers,
+        responseType: "blob",
+        timeout: 60000,
+      });
+      return data as Blob;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError;
+}
+
+export interface DashboardSummaryResponse {
+  stats: {
+    analyses_run: number;
+    docs_uploaded: number;
+    reports_generated: number;
+    risk_flags_found: number;
+  };
+  recent_analyses: {
+    analysis_id: string;
+    company_id: string;
+    company_name: string;
+    credit_score: number;
+    loan_decision: string;
+    risk_flags: string[];
+    risk_category: string;
+    created_at: string;
+  }[];
+}
+
+export interface LatestAnalysisResponse {
+  analysis_id: string;
+  company_id: string;
+  company_name: string;
+  status: string;
+  loan_decision: string;
+  overall_credit_score: number;
+  risk_category: string;
+  character_score: number;
+  capacity_score: number;
+  capital_score: number;
+  collateral_score: number;
+  conditions_score: number;
+  risk_flags: string[];
+  score_breakdown: Record<string, any>;
+}
+
+export async function getDashboardSummary(): Promise<DashboardSummaryResponse> {
+  const token = await getIdToken().catch(() => "");
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+  let lastError: unknown;
+  for (const base of getCandidateBases()) {
+    try {
+      const { data } = await axios.get<DashboardSummaryResponse>(`${base}/api/dashboard-summary`, {
+        headers,
+        timeout: 30000,
+      });
+      return data;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError;
+}
+
+export async function getLatestAnalysis(): Promise<LatestAnalysisResponse> {
+  const token = await getIdToken().catch(() => "");
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+  let lastError: unknown;
+  for (const base of getCandidateBases()) {
+    try {
+      const { data } = await axios.get<LatestAnalysisResponse>(`${base}/api/analysis/latest`, {
+        headers,
+        timeout: 30000,
+      });
+      return data;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError;
+}
 
 export async function getRiskScore(companyId: string) {
-  const { data } = await api.get(`/api/cam/${companyId}`); // Repurposed for now or keep separate
+  const { data } = await api.get(`/api/cam/${companyId}`);
   return data;
 }
 
 export default api;
+

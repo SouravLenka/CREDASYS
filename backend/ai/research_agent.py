@@ -93,14 +93,16 @@ class ResearchAgent:
         if self._llm is None:
             try:
                 from langchain_groq import ChatGroq
+                if not (settings.GROQ_API_KEY or "").strip():
+                    raise RuntimeError("GROQ_API_KEY is missing")
                 self._llm = ChatGroq(
                     model_name=settings.GROQ_MODEL,
                     api_key=settings.GROQ_API_KEY,
                     temperature=0.1,
                 )
             except Exception as e:
-                logger.warning(f"[ResearchAgent] Groq unavailable: {e}. Using mock LLM.")
-                self._llm = _MockLLM()
+                logger.warning(f"[ResearchAgent] Groq unavailable: {e}. Using extractive summariser.")
+                self._llm = None
         return self._llm
 
     def _rotate_llm_model(self) -> None:
@@ -273,6 +275,8 @@ class ResearchAgent:
         )
         try:
             llm = self._get_llm()
+            if llm is None:
+                return self._extractive_summary(company_name, topic, results)
             response = await asyncio.to_thread(llm.invoke, prompt)
             if hasattr(response, "content"):
                 return response.content.strip()
@@ -282,6 +286,8 @@ class ResearchAgent:
                 self._rotate_llm_model()
                 try:
                     llm = self._get_llm()
+                    if llm is None:
+                        return self._extractive_summary(company_name, topic, results)
                     response = await asyncio.to_thread(llm.invoke, prompt)
                     if hasattr(response, "content"):
                         return response.content.strip()
@@ -289,7 +295,28 @@ class ResearchAgent:
                 except Exception:
                     pass
             logger.error(f"[ResearchAgent] LLM summarise failed: {e}")
-            return snippets[:500]
+            return self._extractive_summary(company_name, topic, results)
+
+    def _extractive_summary(self, company_name: str, topic: str, results: list[SearchResult]) -> str:
+        """Deterministic summary from real search snippets when LLM is unavailable."""
+        points: list[str] = []
+        for r in results[:4]:
+            title = (r.title or "").strip()
+            snippet = (r.snippet or "").strip()
+            if title and snippet:
+                points.append(f"{title}: {snippet}")
+            elif snippet:
+                points.append(snippet)
+            elif title:
+                points.append(title)
+
+        if not points:
+            return f"No significant information found about {company_name}'s {topic}."
+
+        text = " ".join(points)
+        if len(text) > 900:
+            text = text[:900].rsplit(" ", 1)[0] + "..."
+        return text
 
     def _identify_risk_flags(self, report: ResearchReport) -> list[str]:
         """Scan summaries for red-flag keywords."""
@@ -315,9 +342,3 @@ class ResearchAgent:
                     break
         return list(set(flags))
 
-
-class _MockLLM:
-    """Fallback mock when Groq is unavailable (dev/test mode)."""
-
-    def invoke(self, prompt: str) -> str:
-        return "[Mock LLM response — set GROQ_API_KEY for real analysis]"

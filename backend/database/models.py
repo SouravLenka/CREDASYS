@@ -1,5 +1,5 @@
 """
-SQLAlchemy ORM models for CredIntel AI.
+SQLAlchemy ORM models for CREDASYS.
 """
 from __future__ import annotations
 
@@ -139,3 +139,4 @@ class CompanyAnalysis(Base):
 
     company = relationship("Company", back_populates="analyses")
     user = relationship("User", back_populates="analyses")
+

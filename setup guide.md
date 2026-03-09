@@ -1,4 +1,4 @@
-# CredIntel AI Setup Guide (Windows)
+# CREDASYS Setup Guide (Windows)
 
 This guide is beginner-friendly and copy-paste ready.
 Follow in order to make all flows work:
@@ -24,7 +24,7 @@ Optional:
 ## 2. Open Project Folder
 
 ```powershell
-cd c:\Users\HP\OneDrive\Desktop\hackathon\credintel-ai
+cd c:\Users\HP\OneDrive\Desktop\hackathon\credasys
 ```
 
 ## 3. Backend Setup
@@ -59,7 +59,7 @@ Open `backend\.env` and set these values:
 ```env
 ENVIRONMENT=development
 AUTH_ENABLED=false
-DATABASE_URL=sqlite+aiosqlite:///./credintel.db
+DATABASE_URL=sqlite+aiosqlite:///./credasys.db
 GROQ_API_KEY=your_groq_api_key
 GROQ_MODEL=llama-3.3-70b-versatile
 SERPAPI_API_KEY=
@@ -90,7 +90,7 @@ Check backend:
 Open a second terminal:
 
 ```powershell
-cd c:\Users\HP\OneDrive\Desktop\hackathon\credintel-ai\frontend
+cd c:\Users\HP\OneDrive\Desktop\hackathon\credasys\frontend
 npm install
 ```
 
@@ -118,7 +118,7 @@ Open app:
 Terminal 1 (backend):
 
 ```powershell
-cd c:\Users\HP\OneDrive\Desktop\hackathon\credintel-ai\backend
+cd c:\Users\HP\OneDrive\Desktop\hackathon\credasys\backend
 .\venv\Scripts\activate
 python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
@@ -126,7 +126,7 @@ python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
 Terminal 2 (frontend):
 
 ```powershell
-cd c:\Users\HP\OneDrive\Desktop\hackathon\credintel-ai\frontend
+cd c:\Users\HP\OneDrive\Desktop\hackathon\credasys\frontend
 npm run dev
 ```
 
@@ -179,22 +179,22 @@ Then restart backend.
 Fix:
 
 ```powershell
-cd c:\Users\HP\OneDrive\Desktop\hackathon\credintel-ai\frontend
+cd c:\Users\HP\OneDrive\Desktop\hackathon\credasys\frontend
 Remove-Item -Recurse -Force .next
 npm run dev
 ```
 
 If still unstable, move repo out of OneDrive (recommended):
 
-- `C:\dev\credintel-ai`
+- `C:\dev\credasys`
 
 ### D) Upload/process fails with DB UUID errors
 
 If you see `badly formed hexadecimal UUID string`, reset local DB once:
 
 ```powershell
-cd c:\Users\HP\OneDrive\Desktop\hackathon\credintel-ai\backend
-if (Test-Path .\credintel.db) { Remove-Item .\credintel.db -Force }
+cd c:\Users\HP\OneDrive\Desktop\hackathon\credasys\backend
+if (Test-Path .\credasys.db) { Remove-Item .\credasys.db -Force }
 ```
 
 Restart backend after deletion.
@@ -231,3 +231,5 @@ You are fully set up when:
 - Research returns insights (not empty error toast).
 - Risk Score page loads data.
 - CAM Report endpoint returns report.
+
+

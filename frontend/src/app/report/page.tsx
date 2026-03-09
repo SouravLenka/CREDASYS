@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
-import { generateReport } from "@/lib/api";
+import { fetchCamReport, getLatestAnalysis } from "@/lib/api";
 import { FileText, Download, Loader2, CheckCircle, ExternalLink } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -14,68 +14,106 @@ export default function ReportPage() {
   const [generating, setGenerating] = useState(false);
   const [report, setReport] = useState<{ pdf_url: string; docx_url: string } | null>(null);
   const [companyName, setCompanyName] = useState("Company");
+  const [companyId, setCompanyId] = useState("");
   const [hasData,     setHasData]     = useState(false);
 
-  const BACKEND =
-    (typeof window !== "undefined" && localStorage.getItem("credintel_backend_url")) ||
-    process.env.NEXT_PUBLIC_BACKEND_URL ||
-    "http://localhost:8000";
-
   useEffect(() => {
-    if (!loading && !user) { router.push("/"); return; }
-    setCompanyName(localStorage.getItem("credintel_company_name") || "Company");
-    const hasScore = !!localStorage.getItem("credintel_score_data");
-    setHasData(hasScore);
+    if (!loading && !user) {
+      router.push("/");
+      return;
+    }
+
+    if (!user) return;
+    let mounted = true;
+
+    (async () => {
+      try {
+        const latest = await getLatestAnalysis();
+        if (!mounted) return;
+        setCompanyName(latest.company_name || "Company");
+        setCompanyId(latest.company_id || "");
+        setHasData((latest.status || "").toLowerCase() === "complete");
+      } catch {
+        if (!mounted) return;
+        setCompanyName(localStorage.getItem("credasys_company_name") || "Company");
+        setCompanyId(localStorage.getItem("credasys_company_id") || "");
+        const hasScore = !!localStorage.getItem("credasys_score_data");
+        setHasData(hasScore);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
   }, [user, loading, router]);
 
   const handleGenerate = async () => {
-    const companyId = localStorage.getItem("credintel_company_id") || "";
-    const scoreRaw = localStorage.getItem("credintel_score_data");
-
-    if (!companyId || !scoreRaw) { toast.error("Run analysis first."); return; }
+    if (!companyId) {
+      toast.error("Run analysis first.");
+      return;
+    }
 
     setGenerating(true);
     try {
-      await generateReport(companyId, "pdf");
+      const [pdfBlob, docxBlob] = await Promise.all([
+        fetchCamReport(companyId, "pdf"),
+        fetchCamReport(companyId, "docx"),
+      ]);
+
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      const docxUrl = URL.createObjectURL(docxBlob);
+
+      if (report?.pdf_url) URL.revokeObjectURL(report.pdf_url);
+      if (report?.docx_url) URL.revokeObjectURL(report.docx_url);
+
       setReport({
-        pdf_url: `/api/cam/${companyId}?format=pdf`,
-        docx_url: `/api/cam/${companyId}?format=docx`,
+        pdf_url: pdfUrl,
+        docx_url: docxUrl,
       });
+      const prevReports = Number(localStorage.getItem("credasys_reports_generated_total") || "0");
+      localStorage.setItem("credasys_reports_generated_total", String(prevReports + 1));
       toast.success("CAM report generated!");
     } catch (e) {
-      toast.error("Report generation failed. Check backend connection.");
+      toast.error("Report generation failed. Ensure analysis is complete and backend is running.");
     } finally {
       setGenerating(false);
     }
   };
 
+  useEffect(() => {
+    return () => {
+      if (report?.pdf_url) URL.revokeObjectURL(report.pdf_url);
+      if (report?.docx_url) URL.revokeObjectURL(report.docx_url);
+    };
+  }, [report]);
+
   if (loading || !user) return null;
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-[var(--bg-primary)]">
       <Navbar />
       <Sidebar />
-      <main className="ml-60 pt-16 p-8">
+      <main className="app-main">
         <div className="max-w-3xl">
           <div className="mb-8">
-            <h1 className="section-title text-3xl">📋 CAM Report</h1>
-            <p className="section-subtitle">Generate a professional Credit Appraisal Memo for {companyName}</p>
+            <h1 className="text-3xl font-bold text-white tracking-tight">CAM Report</h1>
+            <p className="text-slate-400 mt-1">Generate a professional Credit Appraisal Memo for {companyName}</p>
           </div>
 
           {!hasData ? (
-            <div className="glass-card p-12 text-center">
+            <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-12 text-center">
               <FileText className="w-12 h-12 text-slate-600 mx-auto mb-3" />
               <p className="text-slate-400 font-medium">No analysis data found</p>
               <p className="text-slate-500 text-sm mb-4">Run your analysis first.</p>
-              <a href="/research" className="btn-primary">Go to Research →</a>
+              <a href="/research" className="btn-primary">Go to Research</a>
             </div>
           ) : (
             <div className="space-y-6">
               {/* Report preview card */}
-              <div className="glass-card p-6">
+              <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-primary-600/20 flex items-center justify-center">
-                    <FileText className="w-5 h-5 text-primary-400" />
+                  <div className="w-10 h-10 rounded-xl bg-[var(--bg-surface-alt)] flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-cyan-300" />
                   </div>
                   <div>
                     <h2 className="font-semibold text-slate-200">Credit Appraisal Memo</h2>
@@ -105,21 +143,21 @@ export default function ReportPage() {
                   className="btn-primary flex items-center gap-2 disabled:opacity-50 w-full justify-center"
                 >
                   {generating
-                    ? <><Loader2 className="w-4 h-4 animate-spin" />Generating…</>
+                    ? <><Loader2 className="w-4 h-4 animate-spin" />Generating...</>
                     : <><FileText className="w-4 h-4" />Generate CAM Report</>}
                 </button>
               </div>
 
               {/* Downloads */}
               {report && (
-                <div className="glass-card p-6 animate-fade-in">
+                <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6 animate-fade-in">
                   <div className="flex items-center gap-2 mb-4">
                     <CheckCircle className="w-5 h-5 text-green-400" />
                     <h3 className="font-semibold text-green-400">Report Ready!</h3>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <a
-                      href={`${BACKEND}${report.pdf_url}`}
+                      href={report.pdf_url}
                       download
                       target="_blank"
                       rel="noreferrer"
@@ -136,7 +174,7 @@ export default function ReportPage() {
                     </a>
 
                     <a
-                      href={`${BACKEND}${report.docx_url}`}
+                      href={report.docx_url}
                       download
                       target="_blank"
                       rel="noreferrer"
@@ -161,3 +199,5 @@ export default function ReportPage() {
     </div>
   );
 }
+
+

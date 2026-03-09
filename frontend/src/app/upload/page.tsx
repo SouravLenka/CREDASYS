@@ -89,8 +89,11 @@ export default function UploadPage() {
       );
       toast.success(`${result.documents.filter((d) => d.status === "success").length} file(s) uploaded!`);
       // Store company ID for subsequent analysis
-      localStorage.setItem("credintel_company_id",   result.company_id);
-      localStorage.setItem("credintel_company_name", companyName);
+      localStorage.setItem("credasys_company_id",   result.company_id);
+      localStorage.setItem("credasys_company_name", companyName);
+      const successCount = result.documents.filter((d) => d.status === "success").length;
+      const prevTotal = Number(localStorage.getItem("credasys_docs_uploaded_total") || "0");
+      localStorage.setItem("credasys_docs_uploaded_total", String(prevTotal + successCount));
     } catch (e: unknown) {
       const msg = describeError(e);
       toast.error(msg);
@@ -103,18 +106,18 @@ export default function UploadPage() {
   if (loading || !user) return null;
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-[var(--bg-primary)]">
       <Navbar />
       <Sidebar />
-      <main className="ml-60 pt-16 p-8">
+      <main className="app-main">
         <div className="max-w-3xl">
           <div className="mb-8">
-            <h1 className="section-title text-3xl">📂 Upload Documents</h1>
-            <p className="section-subtitle">Supported: PDF, CSV, Excel, TXT (max 50 MB each)</p>
+            <h1 className="text-3xl font-bold text-white tracking-tight">Upload Documents</h1>
+            <p className="text-slate-400 mt-1">Supported: PDF, CSV, Excel, TXT (max 50 MB each)</p>
           </div>
 
           {/* Company */}
-          <div className="glass-card p-6 mb-6">
+          <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6 mb-6">
             <label className="text-sm font-medium text-slate-300 mb-2 block">Company Name *</label>
             <div className="flex items-center gap-3">
               <Building2 className="w-5 h-5 text-slate-500 flex-shrink-0" />
@@ -125,19 +128,19 @@ export default function UploadPage() {
                 onChange={(e) => setCompanyName(e.target.value)}
               />
             </div>
-            <p className="text-xs text-slate-500 mt-2">Company ID: <code className="text-primary-400">{companyId}</code></p>
+            <p className="text-xs text-slate-500 mt-2">Company ID: <code className="text-cyan-300">{companyId}</code></p>
           </div>
 
           {/* Drop zone */}
           <div
             {...getRootProps()}
-            className={`glass-card p-10 text-center cursor-pointer border-2 border-dashed transition-all duration-200 mb-6
-              ${isDragActive ? "border-primary-500 bg-primary-600/10" : "border-primary-600/20 hover:border-primary-500/50 hover:bg-primary-600/5"}`}
+            className={`rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-10 text-center cursor-pointer border-2 border-dashed transition-all duration-200 mb-6
+              ${isDragActive ? "border-cyan-400 bg-[var(--bg-surface-alt)]" : "border-[var(--accent-soft)]/50 hover:border-cyan-400/60 hover:bg-[var(--bg-surface-alt)]"}`}
           >
             <input {...getInputProps()} />
-            <Upload className="w-12 h-12 text-primary-500 mx-auto mb-3" />
+            <Upload className="w-12 h-12 text-cyan-300 mx-auto mb-3" />
             {isDragActive
-              ? <p className="text-primary-400 font-medium">Drop files here…</p>
+              ? <p className="text-cyan-300 font-medium">Drop files here...</p>
               : <>
                   <p className="text-slate-300 font-medium mb-1">Drag & drop files here</p>
                   <p className="text-slate-500 text-sm">or click to browse</p>
@@ -147,10 +150,10 @@ export default function UploadPage() {
 
           {/* File list */}
           {files.length > 0 && (
-            <div className="glass-card p-4 mb-6 space-y-2">
+            <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 mb-6 space-y-2">
               {files.map((f, i) => (
-                <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-navy-900/40">
-                  <File className="w-4 h-4 text-primary-400 flex-shrink-0" />
+                <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-soft)]">
+                  <File className="w-4 h-4 text-cyan-300 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-slate-200 truncate">{f.file.name}</p>
                     <p className="text-xs text-slate-500">{(f.file.size / 1024).toFixed(0)} KB</p>
@@ -161,7 +164,7 @@ export default function UploadPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     {f.status === "pending"   && <div className="w-2 h-2 rounded-full bg-slate-500" />}
-                    {f.status === "uploading" && <Loader2 className="w-4 h-4 text-primary-400 animate-spin" />}
+                    {f.status === "uploading" && <Loader2 className="w-4 h-4 text-cyan-300 animate-spin" />}
                     {f.status === "success"   && <CheckCircle className="w-4 h-4 text-green-400" />}
                     {f.status === "error"     && <AlertCircle className="w-4 h-4 text-red-400" />}
                     {f.status === "pending" && (
@@ -177,12 +180,14 @@ export default function UploadPage() {
 
           <div className="flex gap-3">
             <button onClick={handleUpload} disabled={uploading || files.length === 0} className="btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-              {uploading ? <><Loader2 className="w-4 h-4 animate-spin" />Uploading…</> : <><Upload className="w-4 h-4" />Upload & Ingest</>}
+              {uploading ? <><Loader2 className="w-4 h-4 animate-spin" />Uploading...</> : <><Upload className="w-4 h-4" />Upload & Ingest</>}
             </button>
-            <a href="/research" className="btn-outline">Proceed to Research →</a>
+            <a href="/research" className="btn-outline">Proceed to Research</a>
           </div>
         </div>
       </main>
     </div>
   );
 }
+
+

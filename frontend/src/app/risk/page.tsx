@@ -1,14 +1,23 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
+import { getLatestAnalysis } from "@/lib/api";
+import { AlertTriangle, BarChart3, CheckCircle, FileText, TrendingUp } from "lucide-react";
 import {
-  RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer,
-  BarChart, Bar, XAxis, YAxis, Tooltip, Cell,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  LabelList,
+  RadialBarChart,
+  RadialBar,
+  PolarAngleAxis,
 } from "recharts";
-import { BarChart3, TrendingUp, AlertTriangle, CheckCircle, Info } from "lucide-react";
 
 interface ScoreData {
   character_score: number;
@@ -19,32 +28,22 @@ interface ScoreData {
   overall_credit_score: number;
   risk_category: string;
   explanation: string[];
-  risk_alerts: { type: string; message: string; severity: string }[];
-  indian_intel: Record<string, string>;
   score_breakdown: {
     ratios: {
       debt_to_revenue: number;
       current_ratio: number;
       dscr: number;
-    }
+    };
   };
 }
 
-const FIVE_C_LABELS: Record<string, string> = {
-  character_score:  "Character",
-  capacity_score:   "Capacity",
-  capital_score:    "Capital",
-  collateral_score: "Collateral",
-  conditions_score: "Conditions",
-};
-
-const FIVE_C_DESCRIPTIONS: Record<string, string> = {
-  Character:  "Reputation, management track record, and litigation history.",
-  Capacity:   "Cash flow generation and debt servicing ability.",
-  Capital:    "Net worth, equity ratio, and financial buffer.",
-  Collateral: "Assets available as security against the credit.",
-  Conditions: "Industry outlook and macro-economic environment.",
-};
+const dimensionLabels: { key: keyof ScoreData; label: string }[] = [
+  { key: "character_score", label: "Character" },
+  { key: "capacity_score", label: "Capacity" },
+  { key: "capital_score", label: "Capital" },
+  { key: "collateral_score", label: "Collateral" },
+  { key: "conditions_score", label: "Conditions" },
+];
 
 export default function RiskPage() {
   const { user, loading } = useAuth();
@@ -53,256 +52,214 @@ export default function RiskPage() {
   const [companyName, setCompanyName] = useState("Company");
 
   useEffect(() => {
-    if (!loading && !user) { router.push("/"); return; }
-    const stored = localStorage.getItem("credintel_score_data");
-    if (stored) {
-      try {
-        const raw = JSON.parse(stored);
-        const breakdown = raw?.score_breakdown || {};
-        const overall =
-          Number(raw?.overall_credit_score ?? raw?.credit_score ?? 0) || 0;
-        const flags: string[] = Array.isArray(raw?.risk_flags) ? raw.risk_flags : [];
-        const loanDecision = String(raw?.loan_decision || "").toUpperCase();
-        const riskCategory =
-          overall >= 80 || loanDecision === "APPROVE"
-            ? "Low"
-            : overall >= 60 || loanDecision === "CONDITIONAL APPROVAL"
-              ? "Medium"
-              : "High";
+    if (!loading && !user) {
+      router.push("/");
+      return;
+    }
 
+    const load = async () => {
+      try {
+        const latest = await getLatestAnalysis();
+        const breakdown: any = latest?.score_breakdown || {};
+        const flags: string[] = Array.isArray(latest?.risk_flags) ? latest.risk_flags : [];
+
+        setCompanyName(latest?.company_name || localStorage.getItem("credasys_company_name") || "Company");
         setScoreData({
-          character_score: Number(breakdown?.qualitative ?? 0),
-          capacity_score: Number(breakdown?.financial_strength ?? 0),
-          capital_score: Number(breakdown?.tax_compliance ?? 0),
-          collateral_score: Number(breakdown?.bank_behavior ?? 0),
-          conditions_score: Number(breakdown?.credit_bureau ?? 0),
-          overall_credit_score: overall,
-          risk_category: riskCategory,
+          character_score: Number(latest?.character_score ?? breakdown?.character ?? 0),
+          capacity_score: Number(latest?.capacity_score ?? breakdown?.capacity ?? 0),
+          capital_score: Number(latest?.capital_score ?? breakdown?.capital ?? 0),
+          collateral_score: Number(latest?.collateral_score ?? breakdown?.collateral ?? 0),
+          conditions_score: Number(latest?.conditions_score ?? breakdown?.conditions ?? 0),
+          overall_credit_score: Number(latest?.overall_credit_score ?? 0),
+          risk_category: latest?.risk_category || "High",
           explanation: flags.length ? flags : ["No major risk flags detected"],
-          risk_alerts: flags.map((f) => ({
-            type: "risk_flag",
-            message: f,
-            severity: f.includes("HARD_REJECT") ? "high" : "medium",
-          })),
-          indian_intel: {
-            mca_director_check: "Not available",
-            gst_compliance: "Not available",
-            cibil_simulation: "Not available",
-          },
           score_breakdown: {
             ratios: {
-              debt_to_revenue: 0,
-              current_ratio: 1,
-              dscr: 1,
+              debt_to_revenue: Number(breakdown?.ratios?.debt_to_revenue ?? 0),
+              current_ratio: Number(breakdown?.ratios?.current_ratio ?? 1),
+              dscr: Number(breakdown?.ratios?.dscr ?? 1),
             },
           },
         });
-      } catch (e) {
-        console.error("Failed to parse score data", e);
+      } catch {
+        const stored = localStorage.getItem("credasys_score_data");
+        if (!stored) return;
+
+        try {
+          const raw = JSON.parse(stored);
+          const breakdown = raw?.score_breakdown || {};
+          const overall = Number(raw?.overall_credit_score ?? raw?.credit_score ?? 0) || 0;
+          const flags: string[] = Array.isArray(raw?.risk_flags) ? raw.risk_flags : [];
+          const loanDecision = String(raw?.loan_decision || "").toUpperCase();
+          const riskCategory =
+            overall >= 80 || loanDecision === "APPROVE"
+              ? "Low"
+              : overall >= 60 || loanDecision === "CONDITIONAL APPROVAL"
+                ? "Moderate"
+                : "High";
+
+          setCompanyName(localStorage.getItem("credasys_company_name") || "Company");
+          setScoreData({
+            character_score: Number(breakdown?.character ?? breakdown?.qualitative ?? 0),
+            capacity_score: Number(breakdown?.capacity ?? breakdown?.financial_strength ?? 0),
+            capital_score: Number(breakdown?.capital ?? breakdown?.tax_compliance ?? 0),
+            collateral_score: Number(breakdown?.collateral ?? breakdown?.bank_behavior ?? 0),
+            conditions_score: Number(breakdown?.conditions ?? breakdown?.credit_bureau ?? 0),
+            overall_credit_score: overall,
+            risk_category: riskCategory,
+            explanation: flags.length ? flags : ["No major risk flags detected"],
+            score_breakdown: {
+              ratios: {
+                debt_to_revenue: Number(breakdown?.ratios?.debt_to_revenue ?? 0),
+                current_ratio: Number(breakdown?.ratios?.current_ratio ?? 1),
+                dscr: Number(breakdown?.ratios?.dscr ?? 1),
+              },
+            },
+          });
+        } catch {
+          setScoreData(null);
+        }
       }
-    }
-    setCompanyName(localStorage.getItem("credintel_company_name") || "Company");
+    };
+
+    load();
   }, [user, loading, router]);
+
+  const riskTone = scoreData?.risk_category?.toLowerCase().includes("low")
+    ? "text-emerald-300 border-emerald-500/30 bg-emerald-500/10"
+    : scoreData?.risk_category?.toLowerCase().includes("moderate") ||
+        scoreData?.risk_category?.toLowerCase().includes("medium")
+      ? "text-amber-300 border-amber-500/30 bg-amber-500/10"
+      : "text-rose-300 border-rose-500/30 bg-rose-500/10";
+
+  const fiveCData = useMemo(() => {
+    if (!scoreData) return [];
+    return dimensionLabels.map(({ key, label }) => ({
+      name: label,
+      score: Number(scoreData[key] as number) || 0,
+    }));
+  }, [scoreData]);
+
+  const ratioData = useMemo(() => {
+    if (!scoreData) return [];
+    const debtRatioPercent = Math.max(0, Number((scoreData.score_breakdown.ratios.debt_to_revenue * 100).toFixed(1)));
+    const currentRatioPercent = Math.max(0, Number(Math.min(100, (scoreData.score_breakdown.ratios.current_ratio / 3) * 100).toFixed(1)));
+    const dscrPercent = Math.max(0, Number(Math.min(100, (scoreData.score_breakdown.ratios.dscr / 3) * 100).toFixed(1)));
+    return [
+      { name: "Debt/Rev %", value: Math.min(100, debtRatioPercent), display: `${debtRatioPercent.toFixed(1)}%` },
+      { name: "Current Ratio", value: currentRatioPercent, display: scoreData.score_breakdown.ratios.current_ratio.toFixed(2) },
+      { name: "DSCR", value: dscrPercent, display: scoreData.score_breakdown.ratios.dscr.toFixed(2) },
+    ];
+  }, [scoreData]);
 
   if (loading || !user) return null;
 
-  const radarData = scoreData
-    ? Object.entries(FIVE_C_LABELS).map(([key, label]) => ({
-        label,
-        score: (scoreData[key as keyof ScoreData] as number) ?? 0,
-      }))
-    : [];
-
-  const ratioData = scoreData?.score_breakdown?.ratios ? [
-    { name: "Debt/Rev", value: scoreData.score_breakdown.ratios.debt_to_revenue * 100, full: 100, label: `${(scoreData.score_breakdown.ratios.debt_to_revenue * 100).toFixed(0)}%` },
-    { name: "Current",  value: (scoreData.score_breakdown.ratios.current_ratio / 2) * 100, full: 100, label: scoreData.score_breakdown.ratios.current_ratio.toString() },
-    { name: "DSCR",     value: (scoreData.score_breakdown.ratios.dscr / 2) * 100, full: 100, label: scoreData.score_breakdown.ratios.dscr.toString() },
-  ] : [];
-
-  const riskColor = {
-    Low:    "#22c55e",
-    Medium: "#f59e0b",
-    High:   "#ef4444",
-  }[scoreData?.risk_category ?? "High"] ?? "#ef4444";
-
-  const BadgeClass = {
-    Low:    "badge-low",
-    Medium: "badge-medium",
-    High:   "badge-high",
-  }[scoreData?.risk_category ?? "High"] ?? "badge-high";
-
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-[var(--bg-primary)]">
       <Navbar />
       <Sidebar />
-      <main className="ml-60 pt-16 p-8">
+      <main className="app-main">
         <div className="max-w-6xl mx-auto">
           <div className="mb-8">
-            <h1 className="section-title text-3xl">📊 Risk Analytics</h1>
-            <p className="section-subtitle">Comprehensive Five-Cs credit assessment for {companyName}</p>
+            <h1 className="text-3xl font-bold text-white tracking-tight">Risk Analytics</h1>
+            <p className="text-slate-400 mt-1">Five-C credit assessment for {companyName}</p>
           </div>
 
           {!scoreData ? (
-            <div className="glass-card p-12 text-center">
+            <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-12 text-center">
               <BarChart3 className="w-12 h-12 text-slate-600 mx-auto mb-3" />
               <p className="text-slate-400 font-medium">No score data yet</p>
-              <p className="text-slate-500 text-sm mb-4">Run research &amp; analysis first.</p>
-              <a href="/research" className="btn-primary">Go to Research →</a>
+              <p className="text-slate-500 text-sm mb-4">Run research and analysis first.</p>
+              <a href="/research" className="btn-primary">Go to Research</a>
             </div>
           ) : (
             <div className="space-y-6">
-              
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Left Column: Overall & Radar */}
-                <div className="lg:col-span-1 space-y-6">
-                  {/* Overall score */}
-                  <div className="glass-card p-8 flex flex-col items-center justify-center text-center relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-2">
-                       <div className="w-20 h-20 bg-primary-500/10 rounded-full blur-3xl -mr-10 -mt-10" />
-                    </div>
-                    
-                    <div className="relative w-32 h-32 mb-4">
-                      <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                        <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(37,99,235,0.1)" strokeWidth="10" />
-                        <circle
-                          cx="50" cy="50" r="44" fill="none"
-                          stroke={riskColor}
-                          strokeWidth="10"
-                          strokeDasharray={`${2 * Math.PI * 44}`}
-                          strokeDashoffset={`${2 * Math.PI * 44 * (1 - scoreData.overall_credit_score / 100)}`}
-                          strokeLinecap="round"
-                          className="transition-all duration-1000 ease-out"
-                        />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center flex-col">
-                        <span className="text-3xl font-black text-white">{scoreData.overall_credit_score.toFixed(0)}</span>
-                        <span className="text-xs text-slate-500 font-bold">/100</span>
-                      </div>
-                    </div>
-                    <p className="text-sm font-bold text-slate-400 mb-2 uppercase tracking-tighter">Credit Reliability Score</p>
-                    <span className={`${BadgeClass} px-4 py-1.5 text-xs font-bold`}>{scoreData.risk_category} RISK</span>
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm text-slate-300">Overall Credit Score</p>
+                    <TrendingUp className="w-4 h-4 text-cyan-300" />
                   </div>
+                  <div className="h-52">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadialBarChart
+                        innerRadius="68%"
+                        outerRadius="100%"
+                        data={[{ name: "Score", value: Math.max(0, Math.min(100, scoreData.overall_credit_score)) }]}
+                        startAngle={180}
+                        endAngle={0}
+                      >
+                        <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
+                        <RadialBar dataKey="value" cornerRadius={12} fill="var(--accent)" background={{ fill: "var(--bg-surface-alt)" }} />
+                      </RadialBarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <p className="-mt-5 text-center text-5xl font-black text-white">
+                    {scoreData.overall_credit_score.toFixed(0)}
+                    <span className="text-base text-slate-500">/100</span>
+                  </p>
+                  <div className="mt-3 flex justify-center">
+                    <div className={`inline-flex px-4 py-2 rounded-xl border font-semibold ${riskTone}`}>
+                      {scoreData.risk_category} Risk
+                    </div>
+                  </div>
+                </div>
 
-                  {/* Radar */}
-                  <div className="glass-card p-6 h-[340px]">
-                    <h3 className="font-bold text-slate-200 mb-4 text-xs uppercase tracking-widest text-primary-500">Multidimensional Risk</h3>
-                    <ResponsiveContainer width="100%" height="85%">
-                      <RadarChart data={radarData}>
-                        <PolarGrid stroke="rgba(37,99,235,0.15)" />
-                        <PolarAngleAxis dataKey="label" tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: 600 }} />
-                        <Radar name="Score" dataKey="score" stroke="#2563eb" fill="#2563eb" fillOpacity={0.3} strokeWidth={2} />
-                      </RadarChart>
+                <div className="xl:col-span-2 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
+                  <h3 className="font-semibold text-white mb-4">5C Dimension Scores</h3>
+                  <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--bg-surface)] p-4 h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={fiveCData} margin={{ top: 20, right: 10, left: -10, bottom: 0 }}>
+                        <XAxis dataKey="name" tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} />
+                        <YAxis domain={[0, 100]} tick={{ fill: "#64748b", fontSize: 11 }} axisLine={false} tickLine={false} width={28} />
+                        <Tooltip contentStyle={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", borderRadius: 10 }} />
+                        <Bar dataKey="score" radius={[8, 8, 0, 0]} fill="#60a5fa" maxBarSize={52}>
+                          <LabelList dataKey="score" position="top" fill="#cbd5e1" fontSize={11} />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div className="xl:col-span-2 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
+                  <h3 className="font-semibold text-white mb-4">Financial Ratio Benchmarks</h3>
+                  <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--bg-surface)] p-4 h-60">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={ratioData} margin={{ top: 20, right: 12, left: -8, bottom: 0 }}>
+                        <XAxis dataKey="name" tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} />
+                        <YAxis domain={[0, 100]} tick={{ fill: "#64748b", fontSize: 11 }} axisLine={false} tickLine={false} width={28} />
+                        <Tooltip contentStyle={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", borderRadius: 10 }} />
+                        <Bar dataKey="value" radius={[8, 8, 0, 0]} fill="#34d399" maxBarSize={64}>
+                          <LabelList dataKey="display" position="top" fill="#cbd5e1" fontSize={11} />
+                        </Bar>
+                      </BarChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
 
-                {/* Right Column: Explainable AI & Ratios */}
-                <div className="lg:col-span-2 space-y-6">
-                  {/* WOW Feature: Explainable AI Panel */}
-                  <div className="glass-card p-6 border-l-4 border-primary-500">
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="p-2 rounded-lg bg-primary-500/10">
-                        <Info className="w-5 h-5 text-primary-400" />
+                <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
+                  <h3 className="font-semibold text-white mb-4">Risk Flags</h3>
+                  <div className="space-y-2 max-h-56 overflow-auto pr-1">
+                    {scoreData.explanation.map((flag, idx) => (
+                      <div key={`${flag}-${idx}`} className="flex gap-2 items-start p-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-soft)]">
+                        {flag.toLowerCase().includes("no major") ? (
+                          <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                        ) : (
+                          <AlertTriangle className="w-4 h-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+                        )}
+                        <p className="text-sm text-slate-300">{flag}</p>
                       </div>
-                      <div>
-                        <h3 className="font-bold text-slate-100">Why This Decision?</h3>
-                        <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Explainable AI Insights</p>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-3">
-                      <p className="text-sm text-slate-300 font-medium">
-                        The AI engine assigned a <span className="text-primary-400 font-black">{scoreData.risk_category} Risk</span> rating based on the following key drivers:
-                      </p>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {scoreData.explanation?.map((reason, i) => (
-                          <div key={i} className="flex gap-2 items-start p-3 rounded-xl bg-navy-900/40 border border-slate-800">
-                            {reason.includes("Strong") || reason.includes("Positive") || reason.includes("Clean") || reason.includes("Steady") ? (
-                              <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                            ) : (
-                              <AlertTriangle className="w-4 h-4 text-yellow-500 mt-0.5 flex-shrink-0" />
-                            )}
-                            <p className="text-xs text-slate-400 leading-relaxed">{reason}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Financial Health Charts */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="glass-card p-6">
-                       <div className="flex items-center justify-between mb-6">
-                         <h3 className="font-bold text-slate-200 text-xs uppercase tracking-widest text-primary-500">Financial Health</h3>
-                         <TrendingUp className="w-4 h-4 text-slate-500" />
-                       </div>
-                       <ResponsiveContainer width="100%" height={180}>
-                          <BarChart data={ratioData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                            <XAxis dataKey="name" tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: 700 }} axisLine={false} tickLine={false} />
-                            <Tooltip 
-                               cursor={{fill: 'rgba(37,99,235,0.05)'}}
-                               contentStyle={{ background: "#0f2342", border: "1px solid rgba(37,99,235,0.3)", borderRadius: 12 }}
-                            />
-                            <Bar dataKey="value" radius={[6, 6, 0, 0]} barSize={40}>
-                              {ratioData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={index === 0 ? "#ef4444" : "#2563eb"} />
-                              ))}
-                            </Bar>
-                          </BarChart>
-                       </ResponsiveContainer>
-                       <div className="grid grid-cols-3 gap-2 mt-4">
-                          {ratioData.map((r) => (
-                            <div key={r.name} className="text-center">
-                              <p className="text-[10px] font-bold text-slate-500 uppercase">{r.name}</p>
-                              <p className="text-sm font-bold text-white">{r.label}</p>
-                            </div>
-                          ))}
-                       </div>
-                    </div>
-
-                    {/* WOW Feature: Indian Intelligence Panel */}
-                    <div className="glass-card p-6 bg-primary-500/[0.02]">
-                       <h3 className="font-bold text-slate-200 mb-4 text-xs uppercase tracking-widest text-primary-500">Indian Financial Intel</h3>
-                       <div className="space-y-4">
-                          {[
-                            { label: "MCA Director Check", val: scoreData.indian_intel?.mca_director_check, icon: Building2 },
-                            { label: "GST Compliance", val: scoreData.indian_intel?.gst_compliance, icon: FileText },
-                            { label: "Simulated CIBIL", val: scoreData.indian_intel?.cibil_simulation, icon: ShieldCheck },
-                          ].map((item, i) => (
-                            <div key={i} className="flex flex-col gap-1 border-b border-slate-800 pb-2 last:border-0">
-                               <span className="text-[10px] font-bold text-slate-500 uppercase">{item.label}</span>
-                               <span className="text-xs text-slate-300 font-medium">{item.val}</span>
-                            </div>
-                          ))}
-                       </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
               </div>
 
-              {/* Dimension Breakdown */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                {radarData.map(({ label, score }) => (
-                  <div key={label} className="glass-card p-4 hover:border-primary-500/30 transition-all">
-                    <div className="flex items-center justify-between mb-2">
-                       <span className="font-bold text-slate-300 text-xs">{label}</span>
-                       <span className="text-sm font-black text-white">{score.toFixed(0)}</span>
-                    </div>
-                    <div className="w-full bg-slate-800 rounded-full h-1">
-                      <div className="h-1 rounded-full bg-primary-500" style={{ width: `${score}%` }} />
-                    </div>
-                    <p className="text-[9px] text-slate-500 mt-2 leading-tight uppercase font-bold">{FIVE_C_DESCRIPTIONS[label]}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex justify-center flex-col items-center gap-4 py-8">
-                <a href="/report" className="btn-primary flex items-center gap-3 px-10 py-5 text-xl font-bold shadow-2xl shadow-primary-500/20">
-                  <FileText className="w-6 h-6" /> Generate Official CAM Report
+              <div className="flex justify-center">
+                <a href="/report" className="btn-primary flex items-center gap-2 px-8 py-4 text-lg">
+                  <FileText className="w-5 h-5" /> Generate CAM Report
                 </a>
-                <p className="text-xs text-slate-500 flex items-center gap-2">
-                  <ShieldCheck className="w-3 h-3" /> Report grounded in verified document & web research
-                </p>
               </div>
             </div>
           )}
@@ -312,5 +269,4 @@ export default function RiskPage() {
   );
 }
 
-// Extra icons needed
-import { Building2, FileText, ShieldCheck } from "lucide-react";
+

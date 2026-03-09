@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import { Toaster } from "react-hot-toast";
 
 export const metadata: Metadata = {
-  title: "CredIntel AI — Intelligent Corporate Credit Decision Engine",
+  title: "CREDASYS - Intelligent Corporate Credit Decision Engine",
   description:
     "AI-powered credit risk analysis: upload financial documents, get automated research, Five-Cs credit scoring, and professional CAM reports.",
   keywords: ["credit analysis", "AI", "risk scoring", "CAM", "corporate credit"],
   openGraph: {
-    title: "CredIntel AI",
+    title: "CREDASYS",
     description: "Intelligent Corporate Credit Decision Engine",
     type: "website",
   },
@@ -23,22 +24,25 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
-      <body>
-        <AuthProvider>
-          {children}
-          <Toaster
-            position="top-right"
-            toastOptions={{
-              style: {
-                background: "#0f2342",
-                color: "#f1f5f9",
-                border: "1px solid rgba(37,99,235,0.3)",
-                borderRadius: "12px",
-              },
-            }}
-          />
-        </AuthProvider>
+      <body className="theme-page">
+        <ThemeProvider>
+          <AuthProvider>
+            {children}
+            <Toaster
+              position="top-right"
+              toastOptions={{
+                style: {
+                  background: "var(--bg-card)",
+                  color: "var(--text-primary)",
+                  border: "1px solid var(--border-color)",
+                  borderRadius: "12px",
+                },
+              }}
+            />
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
 }
+

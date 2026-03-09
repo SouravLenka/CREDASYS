@@ -25,8 +25,8 @@ export default function ResearchPage() {
 
   useEffect(() => {
     if (!loading && !user) router.push("/");
-    setCompanyName(localStorage.getItem("credintel_company_name") || "");
-    setCompanyId(localStorage.getItem("credintel_company_id") || "");
+    setCompanyName(localStorage.getItem("credasys_company_name") || "");
+    setCompanyId(localStorage.getItem("credasys_company_id") || "");
   }, [user, loading, router]);
 
   const describeError = (error: unknown): string => {
@@ -62,6 +62,35 @@ export default function ResearchPage() {
     "Finalizing AI insights..."
   ];
 
+  const appendRecentAnalysis = (
+    analysisId: string,
+    scorePayload: any,
+    fallbackFlags: string[] = []
+  ) => {
+    const riskFlags = Array.isArray(scorePayload?.risk_flags)
+      ? scorePayload.risk_flags
+      : fallbackFlags;
+
+    const entry = {
+      analysis_id: analysisId,
+      company_name: companyName,
+      credit_score: Number(scorePayload?.overall_credit_score ?? scorePayload?.credit_score ?? 0),
+      loan_decision: String(scorePayload?.loan_decision || "N/A"),
+      risk_flags: riskFlags,
+      created_at: new Date().toISOString(),
+    };
+
+    try {
+      const prev = JSON.parse(localStorage.getItem("credasys_recent_analyses") || "[]");
+      const list = Array.isArray(prev) ? prev : [];
+      const deduped = list.filter((item: any) => item?.analysis_id !== analysisId);
+      const updated = [entry, ...deduped].slice(0, 30);
+      localStorage.setItem("credasys_recent_analyses", JSON.stringify(updated));
+    } catch {
+      localStorage.setItem("credasys_recent_analyses", JSON.stringify([entry]));
+    }
+  };
+
   useEffect(() => {
     let interval: any;
     if (searching) {
@@ -87,11 +116,16 @@ export default function ResearchPage() {
           const analysisId = processResult.analysis_id;
           if (analysisId) {
             const legacy = await analyzeCompany(analysisId);
-            localStorage.setItem("credintel_analysis_id", analysisId);
-            localStorage.setItem("credintel_company_id", companyId);
+            localStorage.setItem("credasys_analysis_id", analysisId);
+            localStorage.setItem("credasys_company_id", companyId);
             localStorage.setItem(
-              "credintel_score_data",
+              "credasys_score_data",
               JSON.stringify(legacy?.score || legacy || {}),
+            );
+            appendRecentAnalysis(
+              analysisId,
+              legacy?.score || legacy || {},
+              legacy?.risk_flags || []
             );
             result = {
               company: companyName,
@@ -129,8 +163,8 @@ export default function ResearchPage() {
       setAnalysis(result);
       
       // Persist for next steps
-      localStorage.setItem("credintel_research_data", JSON.stringify(result.research));
-      localStorage.setItem("credintel_company_name", companyName);
+      localStorage.setItem("credasys_research_data", JSON.stringify(result.research));
+      localStorage.setItem("credasys_company_name", companyName);
       toast.success("Research complete!", { id: "process" });
     } catch (e) {
       console.error(e);
@@ -143,20 +177,43 @@ export default function ResearchPage() {
   if (loading || !user) return null;
 
   const research = analysis?.research;
+  const insightSections = [
+    { key: "news_summary", label: "Recent News & Media", icon: Newspaper },
+    { key: "promoter_summary", label: "Promoter Background", icon: User },
+    { key: "sector_summary", label: "Sector & Market Trends", icon: Globe },
+    { key: "litigation_summary", label: "Litigation History", icon: Scale },
+    { key: "regulatory_summary", label: "Regulatory & Compliance", icon: Building2 },
+  ] as const;
+
+  const isMeaningfulInsight = (value: unknown) => {
+    if (typeof value !== "string") return false;
+    const text = value.trim();
+    if (!text) return false;
+    const blockedPatterns = [
+      "no data available",
+      "no significant information found",
+      "not available",
+      "n/a",
+      "insufficient information",
+    ];
+    return !blockedPatterns.some((pattern) => text.toLowerCase().includes(pattern));
+  };
+
+  const visibleInsights = insightSections.filter((section) => isMeaningfulInsight(research?.[section.key]));
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-[var(--bg-primary)]">
       <Navbar />
       <Sidebar />
-      <main className="ml-60 pt-16 p-8">
+      <main className="app-main">
         <div className="max-w-4xl">
           <div className="mb-8">
-            <h1 className="section-title text-3xl">🔍 Research Insights</h1>
-            <p className="section-subtitle">Automated web research via AI-powered search agent</p>
+            <h1 className="text-3xl font-bold text-white tracking-tight">Research Insights</h1>
+            <p className="text-slate-400 mt-1">Automated web research via AI-powered search agent</p>
           </div>
 
           {/* Search bar */}
-          <div className="glass-card p-6 mb-6">
+          <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6 mb-6">
             <div className="flex gap-3">
               <div className="flex-1 relative">
                 <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
@@ -169,24 +226,24 @@ export default function ResearchPage() {
                 />
               </div>
               <button onClick={handleSearch} disabled={searching} className="btn-primary flex items-center gap-2 disabled:opacity-50 min-w-[140px] justify-center">
-                {searching ? <><Loader2 className="w-4 h-4 animate-spin" />Researching…</> : <><Search className="w-4 h-4" />Run Research</>}
+                {searching ? <><Loader2 className="w-4 h-4 animate-spin" />Researching...</> : <><Search className="w-4 h-4" />Run Research</>}
               </button>
             </div>
             
             {searching && (
-              <div className="mt-6 p-4 bg-navy-900/50 rounded-xl border border-primary-500/20">
+              <div className="mt-6 p-4 bg-[var(--bg-surface)] rounded-xl border border-[var(--border-soft)]">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-semibold text-primary-400 uppercase tracking-wider">AI Analysis in Progress</span>
+                  <span className="text-xs font-semibold text-cyan-300 uppercase tracking-wider">AI Analysis in Progress</span>
                   <span className="text-xs text-slate-500">{Math.round(((loadStep + 1) / loadingSteps.length) * 100)}%</span>
                 </div>
-                <div className="w-full bg-navy-800 rounded-full h-1.5 mb-4">
+                <div className="w-full bg-[var(--bg-surface-alt)] rounded-full h-1.5 mb-4">
                   <div 
-                    className="bg-primary-500 h-1.5 rounded-full transition-all duration-1000 ease-out" 
+                    className="bg-cyan-400 h-1.5 rounded-full transition-all duration-1000 ease-out" 
                     style={{ width: `${((loadStep + 1) / loadingSteps.length) * 100}%` }}
                   />
                 </div>
                 <div className="flex items-center gap-3">
-                  <Loader2 className="w-5 h-5 text-primary-400 animate-spin" />
+                  <Loader2 className="w-5 h-5 text-cyan-300 animate-spin" />
                   <p className="text-sm text-slate-200 animate-pulse">{loadingSteps[loadStep]}</p>
                 </div>
               </div>
@@ -218,31 +275,32 @@ export default function ResearchPage() {
 
               {/* Research sections */}
               <div className="grid grid-cols-1 gap-4">
-                {[
-                  { key: "news_summary",       label: "Recent News & Media",   icon: Newspaper },
-                  { key: "promoter_summary",   label: "Promoter Background",   icon: User      },
-                  { key: "sector_summary",     label: "Sector & Market Trends",icon: Globe     },
-                  { key: "litigation_summary", label: "Litigation History",    icon: Scale     },
-                  { key: "regulatory_summary", label: "Regulatory & Compliance",icon: Building2 },
-                ].map(({ key, label, icon: Icon }) => (
-                  <div key={key} className="glass-card p-6 group hover:border-primary-500/40 transition-all">
+                {visibleInsights.map(({ key, label, icon: Icon }) => (
+                  <div key={key} className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6 group hover:border-cyan-400/40 transition-all">
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-2">
-                        <div className="w-10 h-10 rounded-xl bg-primary-600/10 flex items-center justify-center group-hover:bg-primary-600/20 transition-all">
-                          <Icon className="w-5 h-5 text-primary-400" />
+                        <div className="w-10 h-10 rounded-xl bg-[var(--bg-surface-alt)] flex items-center justify-center transition-all">
+                          <Icon className="w-5 h-5 text-cyan-300" />
                         </div>
                         <h3 className="font-bold text-slate-100">{label}</h3>
                       </div>
-                      <span className="text-[10px] font-bold text-primary-500/50 uppercase tracking-widest">AI SUMMARY</span>
+                      <span className="text-[10px] font-bold text-cyan-300/60 uppercase tracking-widest">AI SUMMARY</span>
                     </div>
-                    <p className="text-sm text-slate-400 leading-chill">{research[key] || "No data available."}</p>
+                    <p className="text-sm text-slate-400 leading-chill">{research[key]}</p>
                   </div>
                 ))}
+                {visibleInsights.length === 0 && (
+                  <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6">
+                    <p className="text-sm text-slate-400">
+                      No research insights are currently available for this company.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-center pt-4">
                 <a href="/risk" className="btn-primary flex items-center gap-2 px-8 py-4 text-lg">
-                  Next: Visualize Risk Analysis →
+                  Next: Visualize Risk Analysis
                 </a>
               </div>
             </div>
@@ -252,3 +310,5 @@ export default function ResearchPage() {
     </div>
   );
 }
+
+

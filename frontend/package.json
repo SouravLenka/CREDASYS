@@ -1,5 +1,5 @@
 {
-  "name": "credintel-ai-frontend",
+  "name": "credasys-frontend",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -34,3 +34,4 @@
     "eslint-config-next": "14.2.3"
   }
 }
+

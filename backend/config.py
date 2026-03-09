@@ -1,5 +1,5 @@
 """
-Configuration settings for CredIntel AI Backend.
+Configuration settings for CREDASYS Backend.
 Loads environment variables and exposes typed settings.
 """
 import os
@@ -10,13 +10,13 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     # App
-    APP_NAME: str = "CredIntel AI"
+    APP_NAME: str = "CREDASYS"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
     ENVIRONMENT: str = "development"
 
     # Database
-    DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost:5432/credintel"
+    DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost:5432/credasys"
 
     # AI / LLM
     GROQ_API_KEY: str = ""
@@ -70,3 +70,4 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
+
