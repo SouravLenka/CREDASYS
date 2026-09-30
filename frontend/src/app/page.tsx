@@ -3,7 +3,6 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { signInWithGoogle } from "@/lib/firebase";
 import { ArrowRight, Shield, Zap, FileText, BarChart3, Search, Upload, Moon, Sun } from "lucide-react";
 import BrandLogo from "@/components/BrandLogo";
 import toast from "react-hot-toast";
@@ -13,7 +12,7 @@ const features = [
   { icon: Search, title: "Research Agent", desc: "Web research for legal, compliance, and market risk signals." },
   { icon: BarChart3, title: "5C Risk Scoring", desc: "Explainable credit scoring across Character, Capacity, Capital, Collateral, Conditions." },
   { icon: FileText, title: "CAM Reports", desc: "Generate downloadable CAM reports in PDF and DOCX." },
-  { icon: Shield, title: "Secure Access", desc: "Google-based authentication and isolated company-level workflows." },
+  { icon: Shield, title: "Demo Access", desc: "Instant demo access for evaluation without external authentication." },
   { icon: Zap, title: "Real-Time Pipeline", desc: "FastAPI backend with dynamic dashboard, risk, research, and reports." },
 ];
 
@@ -26,13 +25,8 @@ export default function LandingPage() {
     if (!loading && user) router.push("/dashboard");
   }, [user, loading, router]);
 
-  const handleLogin = async () => {
-    try {
-      await signInWithGoogle();
-      router.push("/dashboard");
-    } catch {
-      toast.error("Sign-in failed. Please try again.");
-    }
+  const handleLogin = () => {
+    router.push("/dashboard");
   };
 
   return (
@@ -77,7 +71,7 @@ export default function LandingPage() {
 
         <div className="flex flex-wrap items-center gap-4">
           <button onClick={handleLogin} className="btn-primary flex items-center gap-2">
-            Continue with Google <ArrowRight className="w-4 h-4" />
+            Enter Demo <ArrowRight className="w-4 h-4" />
           </button>
           <a href="#features" className="btn-outline">Explore Features</a>
         </div>
@@ -98,7 +92,7 @@ export default function LandingPage() {
       </section>
 
       <footer className="relative z-10 text-center py-6 text-slate-500 text-sm border-t border-[var(--border-color)]">
-        CREDASYS - Hackathon Build
+        CREDASYS - Demo Build
       </footer>
     </div>
   );
