@@ -3,7 +3,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { signOutUser } from "@/lib/firebase";
 import { LogOut, User, Moon, Sun } from "lucide-react";
 import BrandLogo from "@/components/BrandLogo";
 import toast from "react-hot-toast";
@@ -13,9 +12,8 @@ export default function Navbar() {
   const { theme, toggleTheme } = useTheme();
   const router = useRouter();
 
-  const handleSignOut = async () => {
-    await signOutUser();
-    toast.success("Signed out");
+  const handleSignOut = () => {
+    toast.success("Demo session ended");
     router.push("/");
   };
 
