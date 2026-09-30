@@ -89,12 +89,18 @@ class DocumentIngestor:
         chunks = self._chunk_text(text)
         logger.info(f"[Ingestor] Created {len(chunks)} chunks")
 
-        try:
-            self._embed_and_store(chunks, filename)
-            logger.info(f"[Ingestor] Embeddings stored in collection '{self.collection_name}'")
-        except Exception as e:
-            # Do not fail the entire processing pipeline when vector-store write fails.
-            logger.error(f"[Ingestor] Embedding store failed for {filename}: {e}")
+        # Chroma + SentenceTransformers are memory-heavy on small production
+        # containers. The credit decision pipeline does not require vector
+        # retrieval, so keep RAG indexing for local development only.
+        if settings.ENVIRONMENT.lower() in {"production", "prod"}:
+            logger.info("[Ingestor] Skipping Chroma embedding/indexing in production to avoid OOM.")
+        else:
+            try:
+                self._embed_and_store(chunks, filename)
+                logger.info(f"[Ingestor] Embeddings stored in collection '{self.collection_name}'")
+            except Exception as e:
+                # Do not fail the entire processing pipeline when vector-store write fails.
+                logger.error(f"[Ingestor] Embedding store failed for {filename}: {e}")
 
         # Map signals as before but augment with new extraction
         signals = self._extract_signals(text)
