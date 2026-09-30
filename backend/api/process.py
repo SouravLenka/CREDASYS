@@ -22,11 +22,41 @@ async def process_documents(
     logger.info(f"[API] Processing documents for company_id: {company_id}")
     
     # 1. Get pending docs
-    res = await db.execute(select(Document).where(Document.company_id == company_id, Document.status == "pending"))
+    # Recover documents left in "processing" by an interrupted/OOM deployment.
+    # Retry errored documents as well so a previous failed run cannot block
+    # the analysis pipeline forever.
+    res = await db.execute(
+        select(Document).where(
+            Document.company_id == company_id,
+            Document.status.in_(["pending", "processing", "error"]),
+        )
+    )
     docs = res.scalars().all()
     
     if not docs:
-        return {"message": "No pending documents to process."}
+        # There is nothing new to process. Return the latest analysis so the
+        # frontend can continue to Risk Analytics instead of losing state.
+        latest_res = await db.execute(
+            select(CompanyAnalysis)
+            .where(CompanyAnalysis.company_id == company_id)
+            .order_by(CompanyAnalysis.created_at.desc())
+        )
+        latest = latest_res.scalars().first()
+        if latest:
+            return {
+                "message": "No new documents to process.",
+                "company_id": company_id,
+                "processed_count": 0,
+                "analysis_id": latest.id,
+                "extracted_fields": [],
+            }
+        return {
+            "message": "No documents are available for processing.",
+            "company_id": company_id,
+            "processed_count": 0,
+            "analysis_id": None,
+            "extracted_fields": [],
+        }
 
     ingestor = DocumentIngestor(company_id=company_id)
     combined_extracted_data = {}
@@ -34,6 +64,7 @@ async def process_documents(
     for doc in docs:
         try:
             doc.status = "processing"
+            doc.error_message = None
             await db.flush()
             
             with open(doc.stored_path, "rb") as f:
