@@ -151,9 +151,13 @@ export default function ResearchPage() {
               ],
             };
           } else {
+            // No pending documents is not a fatal research error.
             result = await runResearch(companyName);
           }
-        } catch {
+        } catch (processError) {
+          console.error("[Research] Document processing failed:", processError);
+          // Fall back to web research, but do not hide a successful analysis
+          // behind a second failing request.
           result = await runResearch(companyName);
         }
       } else {
