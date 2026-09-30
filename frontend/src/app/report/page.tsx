@@ -55,10 +55,8 @@ export default function ReportPage() {
 
     setGenerating(true);
     try {
-      const [pdfBlob, docxBlob] = await Promise.all([
-        fetchCamReport(companyId, "pdf"),
-        fetchCamReport(companyId, "docx"),
-      ]);
+      const pdfBlob = await fetchCamReport(companyId, "pdf");
+      const docxBlob = await fetchCamReport(companyId, "docx");
 
       const pdfUrl = URL.createObjectURL(pdfBlob);
       const docxUrl = URL.createObjectURL(docxBlob);
