@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: list[str] = ["http://localhost:3000", "https://your-frontend.vercel.app"]
 
     # Security
-    AUTH_ENABLED: bool = True
+    AUTH_ENABLED: bool = False
 
     # Logging
     LOG_LEVEL: str = "INFO"
