@@ -108,8 +108,8 @@ class ResearchAgent:
     def _rotate_llm_model(self) -> None:
         """Switch to a fallback Groq model when the current one is unavailable."""
         candidates = [
-            "llama-3.3-70b-versatile",
-            "llama-3.1-8b-instant",
+            "openai/gpt-oss-20b",
+            "openai/gpt-oss-120b",
         ]
         try:
             from langchain_groq import ChatGroq
