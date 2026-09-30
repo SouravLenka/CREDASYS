@@ -2,7 +2,8 @@ import axios from "axios";
 import { getIdToken } from "./firebase";
 
 const DEFAULT_BASE_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+  process.env.NEXT_PUBLIC_BACKEND_URL ||
+  "https://credasys-backend-production.up.railway.app";
 
 function getBaseUrl() {
   if (typeof window === "undefined") return DEFAULT_BASE_URL;
