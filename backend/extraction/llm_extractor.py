@@ -55,8 +55,8 @@ async def extract_corporate_data(raw_text: str, structured_data: Any = None) -> 
 
         candidate_models = [
             settings.GROQ_MODEL,
-            "llama-3.3-70b-versatile",
-            "llama-3.1-8b-instant",
+            "openai/gpt-oss-20b",
+            "openai/gpt-oss-120b",
         ]
         seen = set()
 
