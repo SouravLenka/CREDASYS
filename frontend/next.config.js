@@ -5,7 +5,9 @@ const nextConfig = {
     domains: ["lh3.googleusercontent.com", "avatars.githubusercontent.com"],
   },
   env: {
-    NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000",
+    NEXT_PUBLIC_BACKEND_URL:
+      process.env.NEXT_PUBLIC_BACKEND_URL ||
+      "https://credasys-backend-production.up.railway.app",
   },
   webpack: (config, { dev }) => {
     if (dev) {
