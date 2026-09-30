@@ -131,7 +131,7 @@ export async function processDocuments(
       const { data } = await axios.post<AnalysisResponse>(
         `${base}/api/process?company_id=${companyId}`,
         null,
-        { headers, timeout: 30000 },
+        { headers, timeout: 180000 },
       );
       return data;
     } catch (err) {
@@ -151,7 +151,7 @@ export async function analyzeCompany(analysisId: string): Promise<any> {
       const { data } = await axios.post(
         `${base}/api/analyze?analysis_id=${analysisId}`,
         null,
-        { headers, timeout: 60000 },
+        { headers, timeout: 180000 },
       );
       return data;
     } catch (err) {
@@ -188,7 +188,7 @@ export async function runResearch(companyName: string): Promise<ResearchResponse
         const { data } = await axios.post<ResearchResponse>(
           `${base}${path}`,
           { company_name: companyName },
-          { headers: authHeaders, timeout: 30000 },
+          { headers: authHeaders, timeout: 60000 },
         );
         return data;
       } catch (err: any) {
